@@ -1,8 +1,8 @@
 {
     "screenshot": {
-        "interval": 5,  // Screenshot interval in seconds
+        "interval": 5,  
         "save_path": "~/shitposter_data/screenshots",
-        "max_stored": 1000  // Maximum number of screenshots to keep
+        "max_stored": 1000  
     },
     "ollama": {
         "model": "llama2",
@@ -15,7 +15,7 @@
         "psm": 11
     },
     "monitoring": {
-        "update_interval": 2,  // Status update interval in seconds
+        "update_interval": 2,  
         "log_level": "INFO",
         "save_analysis": true,
         "analysis_dir": "~/shitposter_data/analysis"
