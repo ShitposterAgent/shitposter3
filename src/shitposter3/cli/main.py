@@ -49,21 +49,45 @@ def analyze():
 @cli.command()
 def status():
     """Print detailed status of the Shitposter processes."""
+    def get_process_info():
+        total_cpu = 0
+        total_memory = 0
+        process_count = 0
+        processes = []
+        
+        for proc in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_info']):
+            try:
+                if 'python' in proc.info['name'].lower() and 'shitposter' in ' '.join(proc.cmdline()).lower():
+                    total_cpu += proc.info['cpu_percent']
+                    total_memory += proc.info['memory_info'].rss
+                    process_count += 1
+                    processes.append(proc.info)
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                pass
+        
+        return {
+            'processes': processes,
+            'total_cpu': total_cpu,
+            'total_memory': total_memory / (1024 * 1024),  # Convert to MB
+            'process_count': process_count
+        }
+
     try:
         while True:
             click.clear()
-            click.echo("Shitposter Status:")
-            click.echo("=================")
-            for proc in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_info', 'status']):
-                click.echo(f"PID: {proc.info['pid']}")
-                click.echo(f"Name: {proc.info['name']}")
-                click.echo(f"CPU: {proc.info['cpu_percent']}%")
-                click.echo(f"Memory: {proc.info['memory_info'].rss / 1024 ** 2:.2f} MB")
-                click.echo(f"Status: {proc.info['status']}")
-                click.echo("-----------------")
-            asyncio.sleep(1)
+            stats = get_process_info()
+            
+            click.echo("Shitposter Status")
+            click.echo("================")
+            click.echo(f"Active Processes: {stats['process_count']}")
+            click.echo(f"Total CPU Usage: {stats['total_cpu']:.1f}%")
+            click.echo(f"Total Memory: {stats['total_memory']:.1f} MB")
+            click.echo()
+            
+            click.sleep(2)  # Update every 2 seconds
+            
     except KeyboardInterrupt:
-        click.echo("Status monitoring stopped.")
+        click.echo("\nStatus monitoring stopped.")
 
 if __name__ == '__main__':
     cli()
