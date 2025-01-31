@@ -5,7 +5,7 @@
         "max_stored": 1000  
     },
     "ollama": {
-        "model": "llama2",
+        "model": "tinyllama",
         "base_url": "http://localhost:11434",
         "max_context_length": 10,
         "confidence_threshold": 0.7
