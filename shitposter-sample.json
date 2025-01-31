@@ -15,7 +15,8 @@
     },
     "tesseract": {
         "lang": "eng",
-        "psm": 11
+        "psm": 11,
+        "output_path": "~/shitposter_data/ocr"
     },
     "monitoring": {
         "update_interval": 2,
