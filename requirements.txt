@@ -2,7 +2,6 @@ pytesseract>=0.3.10
 pillow>=10.0.0
 python-xlib>=0.33
 pynput>=1.7.6
-requests==2.24.0
 fastapi>=0.104.0
 uvicorn>=0.24.0
 python-multipart>=0.0.6
