@@ -153,6 +153,10 @@ class AutomationEngine:
                         # Save daily analysis if needed
                         if self.config['monitoring'].get('save_analysis', True):
                             self._save_daily_analysis()
+                    else:
+                        _logger.warning("No text extracted from screen image.")
+                else:
+                    _logger.warning("Screen capture returned None.")
                 
                 await asyncio.sleep(self.config['screenshot']['interval'])
             except Exception as e:

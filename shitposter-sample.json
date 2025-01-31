@@ -2,7 +2,8 @@
     "screenshot": {
         "interval": 5,  
         "save_path": "~/shitposter_data/screenshots",
-        "max_stored": 1000  
+        "max_stored": 1000,
+        "method": "mss"  // Added method configuration
     },
     "ollama": {
         "model": "tinyllama",

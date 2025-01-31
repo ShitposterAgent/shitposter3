@@ -21,6 +21,9 @@ class ScreenOCR:
             screenshot = self.sct.grab(monitor)
             img = np.array(screenshot)
             return cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+        except mss.exception.ScreenShotError as e:
+            _logger.error(f"ScreenShotError: {e}. Ensure the application has permission to capture the screen.")
+            return None
         except Exception as e:
             _logger.error(f"Failed to capture screen: {e}")
             return None
@@ -40,6 +43,7 @@ class ScreenOCR:
                 image = self.capture_screen()
             
             if image is None:
+                _logger.error("No image captured to extract text.")
                 return None
                 
             processed_image = self.process_image(image)
