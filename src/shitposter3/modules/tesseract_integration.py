@@ -1,7 +1,7 @@
 """OCR integration module using Tesseract for screen text recognition."""
 
 import logging
-import numpy import np
+import numpy as np
 import cv2
 import subprocess
 import tempfile
