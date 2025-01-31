@@ -119,20 +119,28 @@ class ScreenOCR:
             return None
 
     def capture_screen(self):
-        """Capture the screen using MSS with a fallback to pyautogui."""
+        """Capture the screen by simulating Shift+Print Screen."""
         try:
-            screenshot = self.mss_instance.grab(self.monitor)
-            return Image.frombytes('RGB', screenshot.size, screenshot.rgb)
-        except AttributeError as e:
-            _logger.error(f"MSS screen capture failed: {e}")
-            _logger.warning("Ensure that tkinter is installed. Run: sudo apt-get install python3-tk python3-dev")
-            try:
-                import pyautogui
-                screenshot = pyautogui.screenshot()
-                return screenshot
-            except Exception as ex:
-                _logger.error(f"PyAutoGUI screenshot capture failed: {ex}")
+            # Simulate Shift+Print Screen key press
+            simulate_screenshot_shortcut()
+            
+            # Wait briefly to ensure the screenshot is saved
+            time.sleep(0.5)
+            
+            # Retrieve the latest screenshot
+            screenshot_path = find_latest_screenshot(max_age_seconds=5)
+            if not screenshot_path:
+                _logger.error("No recent screenshot found after simulating shortcut")
                 return None
+            
+            # Load and return the screenshot image
+            image = cv2.imread(screenshot_path)
+            self.last_screenshot_path = screenshot_path
+            _logger.debug("Screenshot captured successfully via simulated shortcut")
+            return image
+        except Exception as e:
+            _logger.error(f"Simulated screenshot capture failed: {e}")
+            return None
 
     def extract_text(self, image=None, lang=None):
         """Extract text from image using Tesseract OCR via subprocess."""
