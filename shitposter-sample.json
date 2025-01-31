@@ -1,9 +1,10 @@
 {
     "screenshot": {
-        "interval": 5,  
+        "interval": 5,
         "save_path": "~/shitposter_data/screenshots",
         "max_stored": 1000,
-        "method": "mss"  
+        "method": "mss",
+        "monitor": "primary"  
     },
     "ollama": {
         "model": "tinyllama",
@@ -16,7 +17,7 @@
         "psm": 11
     },
     "monitoring": {
-        "update_interval": 2,  
+        "update_interval": 2,
         "log_level": "INFO",
         "save_analysis": true,
         "analysis_dir": "~/shitposter_data/analysis"

@@ -17,16 +17,33 @@ class ScreenOCR:
     def __init__(self, config=None):
         self.last_screenshot_path = None
         self.config = config or {}
-        self.config = config or {}
         _logger.debug("ScreenOCR initialized with config: %s", self.config)
         self.setup_directories()
         try:
             self.sct = mss.mss()
-            self.mss_instance = mss.mss()  # Initialize mss_instance
+            self.mss_instance = mss.mss()
+            # Initialize monitor configuration
+            self.monitor = self._get_monitor_config()
             _logger.debug("MSS initialized successfully")
         except Exception as e:
             _logger.error("Failed to initialize MSS: %s", e)
         
+    def _get_monitor_config(self):
+        """Get monitor configuration based on settings or default to primary monitor."""
+        try:
+            monitor_number = self.config.get('screenshot', {}).get('monitor', 1)
+            if monitor_number == 'primary':
+                return self.mss_instance.monitors[1]  # Primary monitor is usually index 1
+            elif isinstance(monitor_number, int) and 0 <= monitor_number < len(self.mss_instance.monitors):
+                return self.mss_instance.monitors[monitor_number]
+            else:
+                _logger.warning(f"Invalid monitor number {monitor_number}, defaulting to primary")
+                return self.mss_instance.monitors[1]
+        except Exception as e:
+            _logger.error(f"Error getting monitor config: {e}")
+            # Return full screen bounds as fallback
+            return {"top": 0, "left": 0, "width": 1920, "height": 1080}
+
     def setup_directories(self):
         """Set up screenshot and analysis directories."""
         screenshot_dir = os.path.expanduser(
