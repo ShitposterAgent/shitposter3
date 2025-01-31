@@ -5,11 +5,9 @@ import numpy as np
 import cv2
 import subprocess
 import tempfile
-import json
 import time
 import os
 import mss
-import tkinter  
 from pathlib import Path
 from ..utils.helpers import simulate_screenshot_shortcut, find_latest_screenshot
 
