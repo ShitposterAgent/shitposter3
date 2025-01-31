@@ -72,21 +72,29 @@ class ScreenOCR:
                 _logger.error(f"Failed to remove old screenshot {file_path}: {e}")
 
     def capture_screen(self):
-        """Capture the screen using MSS and save with timestamped filename."""
+        """Capture the screen using MSS instance and save with timestamped filename."""
         try:
-            with mss() as sct:
-                timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-                filename = os.path.expanduser(
-                    os.path.join(
-                        self.config.get('screenshot', {}).get('save_path', '~/shitposter_data/screenshots'),
-                        f"screenshot_{timestamp}.png"
-                    )
+            # Use existing MSS instance
+            screenshot = self.sct.grab(self.monitor)
+            
+            # Convert to BGR format for OpenCV
+            img = np.array(screenshot)
+            img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+            
+            # Save the screenshot
+            timestamp = time.strftime("%Y%m%d-%H%M%S")
+            filename = os.path.expanduser(
+                os.path.join(
+                    self.config.get('screenshot', {}).get('save_path', '~/shitposter_data/screenshots'),
+                    f"screenshot_{timestamp}.png"
                 )
-                sct.shot(output=filename)
-                _logger.debug(f"Screenshot saved to: {filename}")
-                image = cv2.imread(filename)
-                self.last_screenshot_path = filename
-                return image
+            )
+            
+            cv2.imwrite(filename, img)
+            _logger.debug(f"Screenshot saved to: {filename}")
+            self.last_screenshot_path = filename
+            return img
+            
         except Exception as e:
             _logger.error(f"Failed to capture screenshot using MSS: {e}")
             return None
