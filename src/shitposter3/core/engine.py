@@ -7,19 +7,83 @@ from ..modules.tesseract_integration import ScreenOCR
 from ..modules.ollama_integration import OllamaAI
 from pynput import mouse, keyboard
 import json
+import os
+import time
+from pathlib import Path
+from datetime import datetime
 
 _logger = logging.getLogger(__name__)
 
 class AutomationEngine:
     def __init__(self):
+        self.config = self._load_config()
         self.ocr = ScreenOCR()
-        self.ai = OllamaAI()
+        self.ai = OllamaAI(
+            base_url=self.config['ollama']['base_url'],
+            model=self.config['ollama']['model']
+        )
         self.running = False
         self.learned_patterns = []
         self.mouse_listener = None
         self.keyboard_listener = None
         self.last_screen_content = None
         self.action_queue = asyncio.Queue()
+        self.running_commands = {}
+        self.daily_analysis = []
+        self._setup_directories()
+
+    def _load_config(self) -> dict:
+        """Load configuration from user's home directory or fall back to sample."""
+        home_config = os.path.expanduser("~/shitposter.json")
+        sample_config = os.path.join(os.path.dirname(__file__), "../../../shitposter-sample.json")
+        
+        try:
+            if os.path.exists(home_config):
+                with open(home_config, 'r') as f:
+                    return json.load(f)
+            with open(sample_config, 'r') as f:
+                return json.load(f)
+        except Exception as e:
+            _logger.error(f"Failed to load config: {e}")
+            return {
+                "screenshot": {"interval": 5},
+                "ollama": {"model": "llama2", "base_url": "http://localhost:11434"},
+                "monitoring": {"update_interval": 2}
+            }
+
+    def _setup_directories(self):
+        """Set up necessary directories for storing data."""
+        paths = [
+            os.path.expanduser(self.config["screenshot"].get("save_path", "~/shitposter_data/screenshots")),
+            os.path.expanduser(self.config["monitoring"].get("analysis_dir", "~/shitposter_data/analysis"))
+        ]
+        for path in paths:
+            Path(path).mkdir(parents=True, exist_ok=True)
+
+    def register_command(self, command_name: str, pid: int):
+        """Register a running shitposter command."""
+        self.running_commands[command_name] = {
+            'pid': pid,
+            'start_time': time.time(),
+            'stats': {'cpu': 0, 'memory': 0}
+        }
+
+    def get_command_stats(self) -> Dict[str, Any]:
+        """Get statistics about running shitposter commands."""
+        current_stats = {}
+        for cmd_name, info in self.running_commands.items():
+            try:
+                proc = psutil.Process(info['pid'])
+                current_stats[cmd_name] = {
+                    'pid': info['pid'],
+                    'runtime': time.time() - info['start_time'],
+                    'cpu': proc.cpu_percent(),
+                    'memory': proc.memory_info().rss / (1024 * 1024),  # MB
+                    'status': proc.status()
+                }
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                current_stats[cmd_name] = {'status': 'terminated'}
+        return current_stats
 
     async def start(self):
         """Start the automation engine."""
@@ -36,6 +100,8 @@ class AutomationEngine:
         self.mouse_listener.start()
         self.keyboard_listener.start()
         
+        # Start screen analysis task
+        asyncio.create_task(self._screen_analysis_loop())
         await self._main_loop()
 
     async def stop(self):
@@ -68,6 +134,74 @@ class AutomationEngine:
 
             except Exception as e:
                 _logger.error(f"Error in main loop: {e}")
+
+    async def _screen_analysis_loop(self):
+        """Continuous screen analysis loop."""
+        while self.running:
+            try:
+                screen_image = self.ocr.capture_screen()
+                if screen_image:
+                    text_content = self.ocr.extract_text(screen_image)
+                    if text_content:
+                        analysis = await self.ai.analyze_screen_content(text_content)
+                        self.daily_analysis.append({
+                            'timestamp': datetime.now().isoformat(),
+                            'content': text_content,
+                            'analysis': analysis
+                        })
+                        
+                        # Save daily analysis if needed
+                        if self.config['monitoring'].get('save_analysis', True):
+                            self._save_daily_analysis()
+                
+                await asyncio.sleep(self.config['screenshot']['interval'])
+            except Exception as e:
+                _logger.error(f"Screen analysis error: {e}")
+                await asyncio.sleep(5)  # Wait before retrying
+
+    def _save_daily_analysis(self):
+        """Save the accumulated daily analysis to a file."""
+        if not self.daily_analysis:
+            return
+            
+        analysis_dir = os.path.expanduser(self.config['monitoring']['analysis_dir'])
+        date_str = datetime.now().strftime('%Y-%m-%d')
+        file_path = os.path.join(analysis_dir, f'analysis_{date_str}.json')
+        
+        try:
+            with open(file_path, 'w') as f:
+                json.dump(self.daily_analysis, f, indent=2)
+        except Exception as e:
+            _logger.error(f"Failed to save daily analysis: {e}")
+
+    def get_daily_summary(self) -> Dict[str, Any]:
+        """Generate a summary of the day's screen activity."""
+        if not self.daily_analysis:
+            return {"error": "No analysis data available"}
+            
+        try:
+            # Aggregate confidence scores and patterns
+            total_confidence = 0
+            patterns = {}
+            for entry in self.daily_analysis:
+                analysis = entry['analysis']
+                total_confidence += analysis.get('confidence', 0)
+                for element in analysis.get('key_elements', []):
+                    patterns[element] = patterns.get(element, 0) + 1
+            
+            # Sort patterns by frequency
+            sorted_patterns = sorted(patterns.items(), key=lambda x: x[1], reverse=True)
+            
+            return {
+                "total_observations": len(self.daily_analysis),
+                "average_confidence": total_confidence / len(self.daily_analysis) if self.daily_analysis else 0,
+                "common_patterns": [{"pattern": p[0], "frequency": p[1]} for p in sorted_patterns[:5]],
+                "start_time": self.daily_analysis[0]['timestamp'] if self.daily_analysis else None,
+                "end_time": self.daily_analysis[-1]['timestamp'] if self.daily_analysis else None
+            }
+        except Exception as e:
+            _logger.error(f"Failed to generate daily summary: {e}")
+            return {"error": f"Failed to generate summary: {str(e)}"}
 
     async def _process_analysis(self, analysis: Dict[str, Any]):
         """Process AI analysis of screen content."""

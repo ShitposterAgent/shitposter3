@@ -14,6 +14,7 @@ class OllamaAI:
         self.model = model
         self.context = []
         self.max_context_length = 10
+        self.last_analysis_time = None
 
     async def generate(self, prompt: str, system_prompt: Optional[str] = None) -> Dict[str, Any]:
         """Generate a response using the Ollama model."""
@@ -50,43 +51,52 @@ class OllamaAI:
 
     async def analyze_screen_content(self, text_content: str) -> Dict[str, Any]:
         """Analyze screen content and provide understanding/actions."""
-        system_prompt = """You are an AI assistant analyzing screen content. 
-        Identify key elements, important information, and potential actions. 
+        system_prompt = """You are an AI assistant analyzing screen content to understand user activities.
+        Analyze the following screen content and provide insights.
         Format your response as JSON with the following structure:
         {
-            "understanding": "brief description of what you see",
-            "key_elements": ["list of important elements"],
-            "suggested_actions": ["list of possible actions"],
-            "confidence": 0.0 to 1.0
+            "understanding": "detailed description of what's happening on screen",
+            "detected_activities": ["list of specific activities detected"],
+            "key_elements": ["important UI elements or text found"],
+            "user_intent": "likely user intention based on content",
+            "context_category": "category of the activity (e.g., browsing, coding, document editing)",
+            "confidence": "confidence score between 0.0 and 1.0",
+            "suggested_automations": ["potential automation opportunities"]
         }"""
         
         result = await self.generate(text_content, system_prompt)
         try:
             if isinstance(result.get('response'), str):
-                return json.loads(result['response'])
+                analysis = json.loads(result['response'])
+                analysis['timestamp'] = self.last_analysis_time
+                return analysis
         except json.JSONDecodeError:
-            _logger.error("Failed to parse JSON response")
+            _logger.error("Failed to parse JSON response from Ollama")
         
         return {
             "understanding": "Failed to analyze content",
+            "detected_activities": [],
             "key_elements": [],
-            "suggested_actions": [],
-            "confidence": 0.0
+            "user_intent": "unknown",
+            "context_category": "unknown",
+            "confidence": 0.0,
+            "suggested_automations": []
         }
 
     async def learn_from_interaction(self, screen_before: str, user_action: str, screen_after: str) -> Dict[str, Any]:
         """Learn from user interactions by analyzing before/after states."""
-        learning_prompt = f"""Analyze the following interaction sequence:
-        Before: {screen_before}
+        learning_prompt = f"""Analyze this interaction sequence for automation potential:
+        Before Screen: {screen_before}
         User Action: {user_action}
-        After: {screen_after}
+        After Screen: {screen_after}
         
-        What can be learned from this interaction? Format response as JSON:
+        Format response as JSON:
         {{
-            "pattern": "identified pattern",
-            "trigger_conditions": ["list of conditions"],
-            "expected_outcome": "what should happen",
-            "confidence": 0.0 to 1.0
+            "pattern_detected": "description of the interaction pattern",
+            "trigger_conditions": ["conditions that led to the action"],
+            "action_impact": "what changed after the action",
+            "automation_potential": "score between 0.0 and 1.0",
+            "suggested_rule": "how this could be automated"
         }}"""
         
         result = await self.generate(learning_prompt)
@@ -97,8 +107,9 @@ class OllamaAI:
             _logger.error("Failed to parse learning response")
         
         return {
-            "pattern": "Failed to learn from interaction",
+            "pattern_detected": "Failed to analyze interaction",
             "trigger_conditions": [],
-            "expected_outcome": "",
-            "confidence": 0.0
+            "action_impact": "unknown",
+            "automation_potential": 0.0,
+            "suggested_rule": ""
         }

@@ -5,6 +5,8 @@ import asyncio
 import logging
 import psutil
 import time
+import os
+from datetime import datetime
 from ..core.engine import AutomationEngine
 from ..services.http_server import run_server
 
@@ -22,6 +24,8 @@ def cli(debug):
 def run(headless):
     """Run the automation engine."""
     engine = AutomationEngine()
+    # Register the run command
+    engine.register_command('run', os.getpid())
     try:
         asyncio.run(engine.start())
     except KeyboardInterrupt:
@@ -33,6 +37,9 @@ def run(headless):
 @click.option('--port', default=8000, help='Port to run the server on')
 def serve(host, port):
     """Start the HTTP API server."""
+    engine = AutomationEngine()
+    # Register the serve command
+    engine.register_command('serve', os.getpid())
     _logger.info(f"Starting HTTP server on {host}:{port}")
     run_server(host, port)
 
@@ -49,46 +56,100 @@ def analyze():
 
 @cli.command()
 def status():
-    """Print detailed status of the Shitposter processes."""
-    def get_process_info():
-        total_cpu = 0
-        total_memory = 0
-        process_count = 0
-        processes = []
-        
-        for proc in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_info']):
-            try:
-                if 'python' in proc.info['name'].lower() and 'shitposter' in ' '.join(proc.cmdline()).lower():
-                    total_cpu += proc.info['cpu_percent']
-                    total_memory += proc.info['memory_info'].rss
-                    process_count += 1
-                    processes.append(proc.info)
-            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-                pass
-        
-        return {
-            'processes': processes,
-            'total_cpu': total_cpu,
-            'total_memory': total_memory / (1024 * 1024),  # Convert to MB
-            'process_count': process_count
-        }
-
+    """Monitor Shitposter status, processes, and screen analysis."""
+    engine = AutomationEngine()
+    
     try:
         while True:
             click.clear()
-            stats = get_process_info()
             
-            click.echo("Shitposter Status")
-            click.echo("================")
-            click.echo(f"Active Processes: {stats['process_count']}")
-            click.echo(f"Total CPU Usage: {stats['total_cpu']:.1f}%")
-            click.echo(f"Total Memory: {stats['total_memory']:.1f} MB")
-            click.echo()
+            # Get process stats
+            stats = engine.get_command_stats()
             
-            time.sleep(2)  # Update every 2 seconds
+            # Header
+            click.echo("Shitposter Status Monitor")
+            click.echo("=======================")
+            click.echo(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            
+            # Running Commands
+            click.echo("Active Commands:")
+            click.echo("--------------")
+            if stats:
+                for cmd_name, info in stats.items():
+                    if info.get('status') != 'terminated':
+                        click.echo(f"Command: {cmd_name}")
+                        click.echo(f"  PID: {info.get('pid', 'N/A')}")
+                        click.echo(f"  Runtime: {info.get('runtime', 0):.1f}s")
+                        click.echo(f"  CPU: {info.get('cpu', 0):.1f}%")
+                        click.echo(f"  Memory: {info.get('memory', 0):.1f}MB")
+                        click.echo(f"  Status: {info.get('status', 'unknown')}")
+                        click.echo()
+            else:
+                click.echo("No active commands\n")
+            
+            # Daily Analysis Summary
+            summary = engine.get_daily_summary()
+            if not summary.get('error'):
+                click.echo("Screen Analysis Summary:")
+                click.echo("----------------------")
+                click.echo(f"Observations: {summary.get('total_observations', 0)}")
+                click.echo(f"Confidence: {summary.get('average_confidence', 0):.1f}%")
+                
+                if summary.get('common_patterns'):
+                    click.echo("\nCommon Screen Patterns:")
+                    for pattern in summary.get('common_patterns', []):
+                        click.echo(f"  • {pattern['pattern']} ({pattern['frequency']} times)")
+            
+            time.sleep(2)  # Update interval
             
     except KeyboardInterrupt:
         click.echo("\nStatus monitoring stopped.")
+
+@cli.command()
+def daily_report():
+    """Generate a report of today's screen activity and resource usage."""
+    engine = AutomationEngine()
+    summary = engine.get_daily_summary()
+    
+    if summary.get('error'):
+        click.echo(f"Error generating report: {summary['error']}")
+        return
+    
+    click.echo("\nShitposter Daily Report")
+    click.echo("=====================")
+    click.echo(f"Date: {datetime.now().strftime('%Y-%m-%d')}")
+    click.echo(f"\nAnalysis Period: {summary.get('start_time')} to {summary.get('end_time')}")
+    click.echo(f"Total Observations: {summary.get('total_observations')}")
+    click.echo(f"Average Confidence: {summary.get('average_confidence'):.1f}%")
+    
+    if summary.get('common_patterns'):
+        click.echo("\nMost Common Screen Activities:")
+        for pattern in summary.get('common_patterns'):
+            click.echo(f"  • {pattern['pattern']}")
+            click.echo(f"    Frequency: {pattern['frequency']} observations")
+
+@cli.command()
+def init():
+    """Initialize shitposter configuration in user's home directory."""
+    home_config = os.path.expanduser("~/shitposter.json")
+    sample_config = os.path.join(os.path.dirname(__file__), "../../../shitposter-sample.json")
+    
+    if os.path.exists(home_config):
+        click.echo("Configuration file already exists at ~/shitposter.json")
+        if click.confirm("Do you want to overwrite it?", default=False):
+            try:
+                with open(sample_config, 'r') as src, open(home_config, 'w') as dst:
+                    dst.write(src.read())
+                click.echo("Configuration file has been reset to default settings")
+            except Exception as e:
+                click.echo(f"Error resetting configuration: {e}")
+    else:
+        try:
+            with open(sample_config, 'r') as src, open(home_config, 'w') as dst:
+                dst.write(src.read())
+            click.echo("Configuration file created at ~/shitposter.json")
+        except Exception as e:
+            click.echo(f"Error creating configuration: {e}")
 
 if __name__ == '__main__':
     cli()

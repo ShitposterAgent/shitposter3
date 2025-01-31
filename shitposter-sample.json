@@ -1,0 +1,23 @@
+{
+    "screenshot": {
+        "interval": 5,  // Screenshot interval in seconds
+        "save_path": "~/shitposter_data/screenshots",
+        "max_stored": 1000  // Maximum number of screenshots to keep
+    },
+    "ollama": {
+        "model": "llama2",
+        "base_url": "http://localhost:11434",
+        "max_context_length": 10,
+        "confidence_threshold": 0.7
+    },
+    "tesseract": {
+        "lang": "eng",
+        "psm": 11
+    },
+    "monitoring": {
+        "update_interval": 2,  // Status update interval in seconds
+        "log_level": "INFO",
+        "save_analysis": true,
+        "analysis_dir": "~/shitposter_data/analysis"
+    }
+}
