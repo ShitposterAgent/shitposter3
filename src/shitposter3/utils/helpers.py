@@ -10,12 +10,16 @@ from pynput.keyboard import Key, Controller
 keyboard = Controller()
 
 def simulate_screenshot_shortcut():
-    """Simulate pressing Shift+PrtScr."""
-    keyboard.press(Key.shift)
-    keyboard.press(Key.print_screen)
-    time.sleep(0.1)  # Small delay to ensure key press is registered
-    keyboard.release(Key.print_screen)
-    keyboard.release(Key.shift)
+    """Simulate pressing Shift+PrtScr with increased delay to ensure registration."""
+    try:
+        keyboard.press(Key.shift)
+        keyboard.press(Key.print_screen)
+        time.sleep(0.2)  # Increased delay
+        keyboard.release(Key.print_screen)
+        keyboard.release(Key.shift)
+        _logger.debug("Simulated Shift+Print Screen key press successfully")
+    except Exception as e:
+        _logger.error(f"Failed to simulate screenshot shortcut: {e}")
 
 def get_screenshots_directory():
     """Get the system's screenshots directory."""

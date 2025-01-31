@@ -119,28 +119,32 @@ class ScreenOCR:
             return None
 
     def capture_screen(self):
-        """Capture the screen by simulating Shift+Print Screen."""
+        """Capture the screen by simulating Shift+Print Screen with fallback."""
         try:
             # Simulate Shift+Print Screen key press
             simulate_screenshot_shortcut()
             
             # Wait briefly to ensure the screenshot is saved
-            time.sleep(0.5)
+            time.sleep(1)  # Increased wait time
             
             # Retrieve the latest screenshot
             screenshot_path = find_latest_screenshot(max_age_seconds=5)
             if not screenshot_path:
-                _logger.error("No recent screenshot found after simulating shortcut")
-                return None
+                _logger.warning("Simulated shortcut failed, attempting MSS capture")
+                return self.capture_screen_mss()
             
             # Load and return the screenshot image
             image = cv2.imread(screenshot_path)
-            self.last_screenshot_path = screenshot_path
-            _logger.debug("Screenshot captured successfully via simulated shortcut")
-            return image
+            if image is not None:
+                self.last_screenshot_path = screenshot_path
+                _logger.debug("Screenshot captured successfully via simulated shortcut")
+                return image
+            else:
+                _logger.error("Failed to load the captured screenshot image")
+                return None
         except Exception as e:
             _logger.error(f"Simulated screenshot capture failed: {e}")
-            return None
+            return self.capture_screen_mss()
 
     def extract_text(self, image=None, lang=None):
         """Extract text from image using Tesseract OCR via subprocess."""
