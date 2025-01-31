@@ -1,12 +1,12 @@
 """OCR integration module using Tesseract for screen text recognition."""
 
 import logging
-import pytesseract
 import mss
 import numpy as np
 import cv2
 import subprocess
 import tempfile
+import json
 
 _logger = logging.getLogger(__name__)
 
@@ -70,22 +70,51 @@ class ScreenOCR:
                 return None
                 
             processed_image = self.process_image(image)
-            data = pytesseract.image_to_data(processed_image, lang=lang, output_type=pytesseract.Output.DICT)
-            
-            results = []
-            for i in range(len(data['text'])):
-                if data['text'][i].strip():
-                    results.append({
-                        'text': data['text'][i],
-                        'conf': data['conf'][i],
-                        'bbox': (
-                            data['left'][i],
-                            data['top'][i],
-                            data['width'][i],
-                            data['height'][i]
-                        )
-                    })
-            return results
+            with tempfile.NamedTemporaryFile(suffix='.png') as tmp:
+                cv2.imwrite(tmp.name, processed_image)
+                result = subprocess.run(
+                    ['tesseract', tmp.name, 'stdout', '-l', lang, '--psm', '11', 'tsv'],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+                
+                if result.returncode != 0:
+                    _logger.error(f"Tesseract OCR failed: {result.stderr}")
+                    return None
+                
+                # Parse TSV output
+                lines = result.stdout.strip().split('\n')
+                if len(lines) < 2:  # Need at least header and one data row
+                    return []
+                
+                headers = lines[0].split('\t')
+                results = []
+                
+                for line in lines[1:]:
+                    parts = line.split('\t')
+                    if len(parts) != len(headers):
+                        continue
+                        
+                    data = dict(zip(headers, parts))
+                    if data.get('text', '').strip():
+                        try:
+                            results.append({
+                                'text': data['text'],
+                                'conf': float(data['conf']),
+                                'bbox': (
+                                    int(data['left']),
+                                    int(data['top']),
+                                    int(data['width']),
+                                    int(data['height'])
+                                )
+                            })
+                        except (ValueError, KeyError) as e:
+                            _logger.warning(f"Failed to parse line data: {e}")
+                            continue
+                
+                return results
+                
         except Exception as e:
             _logger.error(f"OCR extraction with positions failed: {e}")
             return None
