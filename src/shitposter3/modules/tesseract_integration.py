@@ -9,7 +9,7 @@ import time
 import os
 import mss
 from pathlib import Path
-from ..utils.helpers import simulate_screenshot_shortcut, find_latest_screenshot
+from ..utils.helpers import find_latest_screenshot
 
 _logger = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ class ScreenOCR:
             return {"top": 0, "left": 0, "width": 1920, "height": 1080}
 
     def setup_directories(self):
-        """Set up screenshot and analysis directories."""
+        """Set up screenshot directory."""
         screenshot_dir = os.path.expanduser(
             self.config.get('screenshot', {}).get('save_path', '~/shitposter_data/screenshots')
         )
@@ -71,80 +71,25 @@ class ScreenOCR:
             except Exception as e:
                 _logger.error(f"Failed to remove old screenshot {file_path}: {e}")
 
-    def capture_screen_mss(self, monitor_number=1):
-        """Capture screen using MSS."""
-        try:
-            _logger.debug("Attempting MSS capture for monitor %d", monitor_number)
-            monitor = self.sct.monitors[monitor_number]
-            _logger.debug("Monitor info: %s", monitor)
-            screenshot = self.sct.grab(monitor)
-            # Convert to BGR format for OpenCV
-            img = np.array(screenshot)
-            img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
-            
-            # Save the screenshot
-            screenshot_dir = os.path.expanduser(
-                self.config.get('screenshot', {}).get('save_path', '~/shitposter_data/screenshots')
-            )
-            timestamp = time.strftime("%Y%m%d-%H%M%S")
-            self.last_screenshot_path = os.path.join(screenshot_dir, f"screenshot_{timestamp}.png")
-            cv2.imwrite(self.last_screenshot_path, img)
-            _logger.debug("MSS capture successful, saved to: %s", self.last_screenshot_path)
-            
-            return img
-        except Exception as e:
-            _logger.error(f"MSS screen capture failed: {e}")
-            return None
-
-    def capture_screen_shortcut(self, monitor_number=1):
-        """Capture screen using keyboard shortcut."""
-        try:
-            simulate_screenshot_shortcut()
-            
-            # Give the system a moment to save the screenshot
-            interval = self.config.get('screenshot', {}).get('interval', 5)
-            time.sleep(min(interval * 0.1, 0.5))  # Wait up to 0.5s or 10% of interval
-            
-            screenshot_path = find_latest_screenshot(max_age_seconds=5)
-            
-            if not screenshot_path:
-                _logger.error("No recent screenshot found after simulating shortcut")
-                return None
-                
-            self.last_screenshot_path = screenshot_path
-            return cv2.imread(screenshot_path)
-            
-        except Exception as e:
-            _logger.error(f"Keyboard shortcut screen capture failed: {e}")
-            return None
-
     def capture_screen(self):
-        """Capture the screen by simulating Shift+Print Screen with fallback."""
+        """Capture the screen using MSS and save with timestamped filename."""
         try:
-            # Simulate Shift+Print Screen key press
-            simulate_screenshot_shortcut()
-            
-            # Wait briefly to ensure the screenshot is saved
-            time.sleep(1)  # Increased wait time
-            
-            # Retrieve the latest screenshot
-            screenshot_path = find_latest_screenshot(max_age_seconds=5)
-            if not screenshot_path:
-                _logger.warning("Simulated shortcut failed, attempting MSS capture")
-                return self.capture_screen_mss()
-            
-            # Load and return the screenshot image
-            image = cv2.imread(screenshot_path)
-            if image is not None:
-                self.last_screenshot_path = screenshot_path
-                _logger.debug("Screenshot captured successfully via simulated shortcut")
+            with mss() as sct:
+                timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+                filename = os.path.expanduser(
+                    os.path.join(
+                        self.config.get('screenshot', {}).get('save_path', '~/shitposter_data/screenshots'),
+                        f"screenshot_{timestamp}.png"
+                    )
+                )
+                sct.shot(output=filename)
+                _logger.debug(f"Screenshot saved to: {filename}")
+                image = cv2.imread(filename)
+                self.last_screenshot_path = filename
                 return image
-            else:
-                _logger.error("Failed to load the captured screenshot image")
-                return None
         except Exception as e:
-            _logger.error(f"Simulated screenshot capture failed: {e}")
-            return self.capture_screen_mss()
+            _logger.error(f"Failed to capture screenshot using MSS: {e}")
+            return None
 
     def extract_text(self, image=None, lang=None):
         """Extract text from image using Tesseract OCR via subprocess."""
