@@ -4,6 +4,7 @@ import click
 import asyncio
 import logging
 import psutil
+import time
 from ..core.engine import AutomationEngine
 from ..services.http_server import run_server
 
@@ -84,7 +85,7 @@ def status():
             click.echo(f"Total Memory: {stats['total_memory']:.1f} MB")
             click.echo()
             
-            click.sleep(2)  # Update every 2 seconds
+            time.sleep(2)  # Update every 2 seconds
             
     except KeyboardInterrupt:
         click.echo("\nStatus monitoring stopped.")
