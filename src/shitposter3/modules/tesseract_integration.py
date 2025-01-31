@@ -5,6 +5,8 @@ import pytesseract
 import mss
 import numpy as np
 import cv2
+import subprocess
+import tempfile
 
 _logger = logging.getLogger(__name__)
 
@@ -32,7 +34,7 @@ class ScreenOCR:
         return threshold
 
     def extract_text(self, image=None, lang='eng'):
-        """Extract text from image using Tesseract OCR."""
+        """Extract text from image using Tesseract OCR via subprocess."""
         try:
             if image is None:
                 image = self.capture_screen()
@@ -41,8 +43,19 @@ class ScreenOCR:
                 return None
                 
             processed_image = self.process_image(image)
-            text = pytesseract.image_to_string(processed_image, lang=lang)
-            return text.strip()
+            with tempfile.NamedTemporaryFile(suffix='.png') as tmp:
+                cv2.imwrite(tmp.name, processed_image)
+                result = subprocess.run(
+                    ['tesseract', tmp.name, 'stdout', '-l', lang],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+                if result.returncode == 0:
+                    return result.stdout.strip()
+                else:
+                    _logger.error(f"Tesseract OCR failed: {result.stderr}")
+                    return None
         except Exception as e:
             _logger.error(f"OCR extraction failed: {e}")
             return None
