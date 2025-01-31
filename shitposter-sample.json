@@ -10,7 +10,8 @@
         "model": "tinyllama",
         "base_url": "http://localhost:11434",
         "max_context_length": 10,
-        "confidence_threshold": 0.7
+        "confidence_threshold": 0.7,
+        "interpretation_prompt": "in a few words, what is this image about?"
     },
     "tesseract": {
         "lang": "eng",
