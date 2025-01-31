@@ -1,5 +1,4 @@
 pytesseract>=0.3.10
-pillow>=10.0.0
 python-xlib>=0.33
 pynput>=1.7.6
 fastapi>=0.104.0

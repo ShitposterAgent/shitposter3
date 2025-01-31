@@ -2,7 +2,6 @@
 
 import logging
 import pytesseract
-from PIL import Image
 import mss
 import numpy as np
 import cv2
@@ -18,20 +17,19 @@ class ScreenOCR:
         try:
             monitor = self.sct.monitors[monitor_number]
             screenshot = self.sct.grab(monitor)
-            return Image.frombytes('RGB', screenshot.size, screenshot.rgb)
+            img = np.array(screenshot)
+            return cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         except Exception as e:
             _logger.error(f"Failed to capture screen: {e}")
             return None
 
     def process_image(self, image):
         """Process image for better OCR results."""
-        # Convert PIL image to opencv format
-        opencv_img = np.array(image)
         # Convert to grayscale
-        gray = cv2.cvtColor(opencv_img, cv2.COLOR_RGB2GRAY)
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         # Apply thresholding to preprocess the image
         threshold = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
-        return Image.fromarray(threshold)
+        return threshold
 
     def extract_text(self, image=None, lang='eng'):
         """Extract text from image using Tesseract OCR."""
