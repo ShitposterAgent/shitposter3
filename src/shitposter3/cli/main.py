@@ -183,5 +183,43 @@ def init():
         except Exception as e:
             click.echo(f"Error creating configuration: {e}")
 
+@cli.command()
+@click.argument('platform')
+@click.option('--text', help='Text content to post')
+@click.option('--title', help='Title for the post (required for Reddit)')
+@click.option('--media', multiple=True, help='Path to media files to attach')
+@click.option('--subreddit', help='Subreddit to post to (for Reddit)')
+@click.option('--type', 'post_type', help='Post type (for Reddit: text/link)', default='text')
+async def post(platform, text, title, media, subreddit, post_type):
+    """Post content to social media platforms.
+    
+    Example: shitposter post twitter --text "Hello world" --media image1.jpg image2.jpg
+    """
+    engine = AutomationEngine()
+    
+    try:
+        # Initialize social media manager
+        if not await engine.social_media.connect():
+            click.echo("Failed to connect to Chrome. Make sure Chrome is running with remote debugging enabled.")
+            return
+
+        content = {
+            'text': text,
+            'title': title,
+            'media': list(media) if media else None,
+            'subreddit': subreddit,
+            'type': post_type
+        }
+
+        if await engine.social_media.post_content(platform, content):
+            click.echo(f"Successfully posted to {platform}")
+        else:
+            click.echo(f"Failed to post to {platform}")
+
+    except Exception as e:
+        click.echo(f"Error posting content: {e}")
+    finally:
+        await engine.social_media.close()
+
 if __name__ == '__main__':
     cli()

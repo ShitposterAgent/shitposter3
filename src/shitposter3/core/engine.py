@@ -23,6 +23,7 @@ class AutomationEngine:
             base_url=self.config['ollama']['base_url'],
             model=self.config['ollama']['model']
         )
+        self.social_media = SocialMediaManager(self.config)
         self.running = False
         self.learned_patterns = []
         self.mouse_listener = None
@@ -329,3 +330,27 @@ class AutomationEngine:
             "extracted_text": text,
             "interpretation": interpretation
         }
+
+    async def post_to_social(self, platform: str, content: Dict[str, Any]) -> bool:
+        """Post content to social media platform."""
+        if not self.social_media:
+            _logger.error("Social media manager not initialized")
+            return False
+            
+        try:
+            # Connect to Chrome if not already connected
+            if not await self.social_media.connect():
+                _logger.error("Failed to connect to Chrome")
+                return False
+                
+            # Add AI-generated hashtags if enabled
+            if (platform == "twitter" and 
+                self.config["social_media"]["twitter"].get("auto_hashtags")):
+                hashtags = await self.ai.generate_hashtags(content["text"])
+                content["text"] += f"\n\n{' '.join(hashtags)}"
+                
+            return await self.social_media.post_content(platform, content)
+            
+        except Exception as e:
+            _logger.error(f"Failed to post to {platform}: {e}")
+            return False

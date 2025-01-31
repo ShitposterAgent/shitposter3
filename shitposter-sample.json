@@ -23,5 +23,23 @@
         "log_level": "INFO",
         "save_analysis": true,
         "analysis_dir": "~/shitposter_data/analysis"
+    },
+    "social_media": {
+        "chrome_debug_url": "http://localhost:9222",
+        "default_platforms": ["twitter", "reddit"],
+        "twitter": {
+            "auto_hashtags": true,
+            "max_media_files": 4
+        },
+        "reddit": {
+            "default_subreddit": "test",
+            "post_type": "text"
+        },
+        "linkedin": {
+            "include_hashtags": true
+        },
+        "facebook": {
+            "privacy": "public"
+        }
     }
 }
