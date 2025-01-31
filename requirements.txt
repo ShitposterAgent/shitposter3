@@ -13,3 +13,4 @@ websockets>=12.0
 click
 psutil
 pyautogui
+tkinter

@@ -9,6 +9,7 @@ import json
 import time
 import os
 import mss
+import tkinter  
 from pathlib import Path
 from ..utils.helpers import simulate_screenshot_shortcut, find_latest_screenshot
 
@@ -23,6 +24,7 @@ class ScreenOCR:
         self.setup_directories()
         try:
             self.sct = mss.mss()
+            self.mss_instance = mss.mss()  # Initialize mss_instance
             _logger.debug("MSS initialized successfully")
         except Exception as e:
             _logger.error("Failed to initialize MSS: %s", e)
@@ -106,8 +108,9 @@ class ScreenOCR:
         try:
             screenshot = self.mss_instance.grab(self.monitor)
             return Image.frombytes('RGB', screenshot.size, screenshot.rgb)
-        except Exception as e:
+        except AttributeError as e:
             _logger.error(f"MSS screen capture failed: {e}")
+            _logger.warning("Ensure that tkinter is installed. Run: sudo apt-get install python3-tk python3-dev")
             try:
                 import pyautogui
                 screenshot = pyautogui.screenshot()
