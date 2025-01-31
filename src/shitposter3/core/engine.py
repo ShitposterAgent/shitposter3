@@ -307,3 +307,25 @@ class AutomationEngine:
                 f"key {'pressed' if pressed else 'released'}: {key}",
                 self.ocr.extract_text()
             )
+
+    def take_new_screenshot(self) -> Optional[str]:
+        """Take a new screenshot and return its path."""
+        from ..utils.helpers import take_screenshot
+        return take_screenshot()
+
+    async def analyze_screenshot(self, screenshot_path: str) -> Dict[str, Any]:
+        """Analyze a screenshot file with OCR and AI interpretation."""
+        text = self.ocr.extract_text_from_file(screenshot_path)
+        if not text:
+            return {"error": "No text extracted from screenshot"}
+            
+        interpretation = await self.ai.interpret_screen(
+            text, 
+            self.config['ollama'].get('interpretation_prompt')
+        )
+        
+        return {
+            "screenshot_path": screenshot_path,
+            "extracted_text": text,
+            "interpretation": interpretation
+        }

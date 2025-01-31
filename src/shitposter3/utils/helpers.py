@@ -1,72 +1,59 @@
 """Helper utilities for the shitposter framework."""
 
 import os
-import glob
+import subprocess
 from datetime import datetime
 from pathlib import Path
-import time
-from pynput.keyboard import Key, Controller
+import logging
 
-keyboard = Controller()
+_logger = logging.getLogger(__name__)
 
-def simulate_screenshot_shortcut():
-    """Simulate pressing Shift+PrtScr with increased delay to ensure registration."""
-    try:
-        keyboard.press(Key.shift)
-        keyboard.press(Key.print_screen)
-        time.sleep(0.2)  # Increased delay
-        keyboard.release(Key.print_screen)
-        keyboard.release(Key.shift)
-        _logger.debug("Simulated Shift+Print Screen key press successfully")
-    except Exception as e:
-        _logger.error(f"Failed to simulate screenshot shortcut: {e}")
-
-def get_screenshots_directory():
-    """Get the system's screenshots directory."""
-    # Common screenshot directories
-    possible_dirs = [
-        os.path.expanduser("~/Pictures/Screenshots"),  # GNOME default
-        os.path.expanduser("~/Pictures"),  # Generic Pictures folder
-        os.path.expanduser("~/Desktop")  # Fallback
-    ]
+def take_screenshot() -> str:
+    """Take a screenshot using gnome-screenshot and save with datetime filename.
     
-    for dir_path in possible_dirs:
-        if os.path.exists(dir_path):
-            return dir_path
-    
-    return None
-
-def find_latest_screenshot(max_age_seconds=5):
-    """Find the most recent screenshot in the screenshots directory.
-    
-    Args:
-        max_age_seconds (int): Maximum age in seconds to consider a screenshot as recent
-        
     Returns:
-        str: Path to the most recent screenshot file, or None if no recent screenshot found
+        str: Path to the saved screenshot file, or None if failed
     """
-    screenshots_dir = get_screenshots_directory()
-    if not screenshots_dir:
-        return None
+    try:
+        # Create screenshots directory if it doesn't exist
+        screenshots_dir = os.path.expanduser("~/shitposter_data/screenshots")
+        Path(screenshots_dir).mkdir(parents=True, exist_ok=True)
         
-    # Look for common screenshot file patterns
-    patterns = [
-        "Screenshot*.png",  # GNOME pattern
-        "screen*.png",      # Alternative pattern
-        "*.png"            # Any PNG file
-    ]
-    
-    newest_file = None
-    newest_time = 0
-    
-    for pattern in patterns:
-        search_path = os.path.join(screenshots_dir, pattern)
-        for file_path in glob.glob(search_path):
-            file_time = os.path.getmtime(file_path)
-            age = time.time() - file_time
+        # Generate filename with current datetime (only digits)
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        filepath = os.path.join(screenshots_dir, f"{timestamp}.png")
+        
+        # Take screenshot using gnome-screenshot
+        result = subprocess.run([
+            'gnome-screenshot',
+            '-f', filepath  # Save to specific file
+        ], capture_output=True, text=True)
+        
+        if result.returncode == 0 and os.path.exists(filepath):
+            _logger.debug(f"Screenshot saved successfully to {filepath}")
+            return filepath
+        else:
+            _logger.error(f"Screenshot failed: {result.stderr}")
+            return None
             
-            if age <= max_age_seconds and file_time > newest_time:
-                newest_file = file_path
-                newest_time = file_time
+    except Exception as e:
+        _logger.error(f"Failed to take screenshot: {e}")
+        return None
+
+def get_latest_screenshot() -> str:
+    """Get the path of the most recent screenshot.
     
-    return newest_file
+    Returns:
+        str: Path to the most recent screenshot file, or None if none found
+    """
+    screenshots_dir = os.path.expanduser("~/shitposter_data/screenshots")
+    try:
+        files = sorted(
+            [f for f in os.listdir(screenshots_dir) if f.endswith('.png')],
+            key=lambda x: os.path.getmtime(os.path.join(screenshots_dir, x)),
+            reverse=True
+        )
+        return os.path.join(screenshots_dir, files[0]) if files else None
+    except Exception as e:
+        _logger.error(f"Failed to get latest screenshot: {e}")
+        return None

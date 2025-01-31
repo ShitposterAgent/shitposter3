@@ -54,14 +54,37 @@ def serve(host, port):
 @cli.command()
 def analyze():
     """Analyze current screen content."""
-    engine = AutomationEngine()
-    try:
-        _logger.debug("Using screenshot method: %s", engine.config.get('screenshot', {}).get('method', 'mss'))
-        image = engine.ocr.capture_screen()
-        text = engine.ocr.extract_text(image)
-        click.echo(f"Screen content:\n{text}")
-    except Exception as e:
-        _logger.error(f"Analysis failed: {e}")
+    async def run_analysis():
+        engine = AutomationEngine()
+        try:
+            # Take new screenshot with specific timestamp filename
+            screenshot_path = engine.take_new_screenshot()
+            if not screenshot_path:
+                click.echo("Failed to capture screenshot")
+                return
+
+            # Run complete analysis
+            result = await engine.analyze_screenshot(screenshot_path)
+            if "error" in result:
+                click.echo(f"Analysis failed: {result['error']}")
+                return
+
+            # Display results in user-friendly format
+            click.echo("\nScreen Analysis Results")
+            click.echo("=====================")
+            click.echo(f"\nScreenshot saved as: {os.path.basename(screenshot_path)}")
+            click.echo("\nExtracted Text:")
+            click.echo("--------------")
+            click.echo(result["extracted_text"])
+            click.echo("\nInterpretation:")
+            click.echo("--------------")
+            click.echo(result["interpretation"])
+
+        except Exception as e:
+            _logger.error(f"Analysis failed: {e}")
+            click.echo(f"Analysis failed: {str(e)}")
+
+    asyncio.run(run_analysis())
 
 @cli.command()
 def status():

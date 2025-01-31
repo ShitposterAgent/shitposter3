@@ -16,6 +16,24 @@ class OllamaAI:
         self.max_context_length = 10
         self.last_analysis_time = None
 
+    async def interpret_screen(self, text_content: str, prompt_template: Optional[str] = None) -> str:
+        """Interpret screen content using the configured prompt.
+        
+        Args:
+            text_content: The extracted text from the screen
+            prompt_template: Optional custom prompt template from config
+            
+        Returns:
+            str: AI interpretation of the screen content
+        """
+        if not prompt_template:
+            prompt_template = "in a few words, what is this image about?"
+            
+        prompt = f"{prompt_template}\n\nScreen content:\n{text_content}"
+        
+        result = await self.generate(prompt)
+        return result.get('response', 'Failed to interpret screen content')
+
     async def generate(self, prompt: str, system_prompt: Optional[str] = None) -> Dict[str, Any]:
         """Generate a response using the Ollama model."""
         try:
