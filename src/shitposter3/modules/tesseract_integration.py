@@ -18,6 +18,7 @@ class ScreenOCR:
     def __init__(self, config=None):
         self.last_screenshot_path = None
         self.config = config or {}
+        self.config = config or {}
         _logger.debug("ScreenOCR initialized with config: %s", self.config)
         self.setup_directories()
         try:
@@ -100,33 +101,20 @@ class ScreenOCR:
             _logger.error(f"Keyboard shortcut screen capture failed: {e}")
             return None
 
-    def capture_screen(self, monitor_number=1):
-        """Capture screen content using configured method."""
-        method = self.config.get('screenshot', {}).get('method', 'mss')
-        _logger.debug("Using screenshot method: %s", method)
-        
-        if method == 'mss':
-            _logger.debug("Using MSS capture method")
-            image = self.capture_screen_mss(monitor_number)
-        else:
-            _logger.debug("Using keyboard shortcut capture method")
-            image = self.capture_screen_shortcut(monitor_number)
-            
-        if image is not None:
-            _logger.debug("Screenshot captured successfully")
-            self.cleanup_old_screenshots()
-        else:
-            _logger.error("Screenshot capture failed")
-            
-        return image
-
-    def process_image(self, image):
-        """Process image for better OCR results."""
-        # Convert to grayscale
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        # Apply thresholding to preprocess the image
-        threshold = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
-        return threshold
+    def capture_screen(self):
+        """Capture the screen using MSS with a fallback to pyautogui."""
+        try:
+            screenshot = self.mss_instance.grab(self.monitor)
+            return Image.frombytes('RGB', screenshot.size, screenshot.rgb)
+        except Exception as e:
+            _logger.error(f"MSS screen capture failed: {e}")
+            try:
+                import pyautogui
+                screenshot = pyautogui.screenshot()
+                return screenshot
+            except Exception as ex:
+                _logger.error(f"PyAutoGUI screenshot capture failed: {ex}")
+                return None
 
     def extract_text(self, image=None, lang=None):
         """Extract text from image using Tesseract OCR via subprocess."""
@@ -219,10 +207,16 @@ class ScreenOCR:
                                     int(data['height'])
                                 )
                             })
+                
                         except (ValueError, KeyError) as e:
                             _logger.warning(f"Failed to parse line data: {e}")
                             continue
                 
+                return results
+                
+        except Exception as e:
+            _logger.error(f"OCR extraction with positions failed: {e}")
+            return None
                 return results
                 
         except Exception as e:
