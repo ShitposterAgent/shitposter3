@@ -2,6 +2,7 @@
 
 import logging
 import asyncio
+import psutil
 from typing import Dict, Any, List, Optional
 from ..modules.tesseract_integration import ScreenOCR
 from ..modules.ollama_integration import OllamaAI
@@ -17,7 +18,7 @@ _logger = logging.getLogger(__name__)
 class AutomationEngine:
     def __init__(self):
         self.config = self._load_config()
-        self.ocr = ScreenOCR()
+        self.ocr = ScreenOCR(self.config)
         self.ai = OllamaAI(
             base_url=self.config['ollama']['base_url'],
             model=self.config['ollama']['model']
@@ -137,28 +138,40 @@ class AutomationEngine:
 
     async def _screen_analysis_loop(self):
         """Continuous screen analysis loop."""
+        interval = self.config['screenshot'].get('interval', 5)
         while self.running:
             try:
                 screen_image = self.ocr.capture_screen()
                 if screen_image:
                     text_content = self.ocr.extract_text(screen_image)
                     if text_content:
-                        analysis = await self.ai.analyze_screen_content(text_content)
+                        # Run AI analysis with custom prompt if configured
+                        ai_prompt = self.config.get('ollama', {}).get('prompt')
+                        analysis = await self.ai.analyze_screen_content(
+                            text_content, 
+                            system_prompt=ai_prompt
+                        )
+                        
+                        # Save analysis with timestamp and screenshot path
                         self.daily_analysis.append({
                             'timestamp': datetime.now().isoformat(),
+                            'screenshot_path': self.ocr.get_last_screenshot_path(),
                             'content': text_content,
                             'analysis': analysis
                         })
                         
-                        # Save daily analysis if needed
+                        # Save analysis if configured
                         if self.config['monitoring'].get('save_analysis', True):
                             self._save_daily_analysis()
+                            
+                        # Print to CLI if debug logging is enabled
+                        _logger.debug(f"Screen Analysis:\n{json.dumps(analysis, indent=2)}")
                     else:
                         _logger.warning("No text extracted from screen image.")
                 else:
                     _logger.warning("Screen capture returned None.")
                 
-                await asyncio.sleep(self.config['screenshot']['interval'])
+                await asyncio.sleep(interval)
             except Exception as e:
                 _logger.error(f"Screen analysis error: {e}")
                 await asyncio.sleep(5)  # Wait before retrying
