@@ -6,6 +6,7 @@ import logging
 import psutil
 import time
 import os
+import json
 from datetime import datetime
 from ..core.engine import AutomationEngine
 from ..services.http_server import run_server
@@ -18,6 +19,13 @@ def cli(debug):
     """Shitposter - AI-powered desktop automation framework."""
     log_level = logging.DEBUG if debug else logging.INFO
     logging.basicConfig(level=log_level)
+    # Load config at CLI startup
+    config = None
+    try:
+        with open(os.path.expanduser("~/shitposter.json"), 'r') as f:
+            config = json.load(f)
+    except Exception as e:
+        _logger.warning(f"Failed to load config: {e}, using defaults")
 
 @cli.command()
 @click.option('--headless/--no-headless', default=False, help="Run in headless mode")
@@ -48,6 +56,7 @@ def analyze():
     """Analyze current screen content."""
     engine = AutomationEngine()
     try:
+        _logger.debug("Using screenshot method: %s", engine.config.get('screenshot', {}).get('method', 'mss'))
         image = engine.ocr.capture_screen()
         text = engine.ocr.extract_text(image)
         click.echo(f"Screen content:\n{text}")

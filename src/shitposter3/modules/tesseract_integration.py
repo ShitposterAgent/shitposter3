@@ -8,6 +8,7 @@ import tempfile
 import json
 import time
 import os
+import mss
 from pathlib import Path
 from ..utils.helpers import simulate_screenshot_shortcut, find_latest_screenshot
 
@@ -17,7 +18,13 @@ class ScreenOCR:
     def __init__(self, config=None):
         self.last_screenshot_path = None
         self.config = config or {}
+        _logger.debug("ScreenOCR initialized with config: %s", self.config)
         self.setup_directories()
+        try:
+            self.sct = mss.mss()
+            _logger.debug("MSS initialized successfully")
+        except Exception as e:
+            _logger.error("Failed to initialize MSS: %s", e)
         
     def setup_directories(self):
         """Set up screenshot and analysis directories."""
@@ -25,6 +32,7 @@ class ScreenOCR:
             self.config.get('screenshot', {}).get('save_path', '~/shitposter_data/screenshots')
         )
         Path(screenshot_dir).mkdir(parents=True, exist_ok=True)
+        _logger.debug("Screenshot directory set up at: %s", screenshot_dir)
         
     def cleanup_old_screenshots(self):
         """Clean up old screenshots based on max_stored setting."""
@@ -45,17 +53,40 @@ class ScreenOCR:
             except Exception as e:
                 _logger.error(f"Failed to remove old screenshot {file_path}: {e}")
 
-    def capture_screen(self, monitor_number=1):
-        """Capture screen content using system screenshot functionality."""
+    def capture_screen_mss(self, monitor_number=1):
+        """Capture screen using MSS."""
         try:
-            # Simulate the screenshot shortcut
+            _logger.debug("Attempting MSS capture for monitor %d", monitor_number)
+            monitor = self.sct.monitors[monitor_number]
+            _logger.debug("Monitor info: %s", monitor)
+            screenshot = self.sct.grab(monitor)
+            # Convert to BGR format for OpenCV
+            img = np.array(screenshot)
+            img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+            
+            # Save the screenshot
+            screenshot_dir = os.path.expanduser(
+                self.config.get('screenshot', {}).get('save_path', '~/shitposter_data/screenshots')
+            )
+            timestamp = time.strftime("%Y%m%d-%H%M%S")
+            self.last_screenshot_path = os.path.join(screenshot_dir, f"screenshot_{timestamp}.png")
+            cv2.imwrite(self.last_screenshot_path, img)
+            _logger.debug("MSS capture successful, saved to: %s", self.last_screenshot_path)
+            
+            return img
+        except Exception as e:
+            _logger.error(f"MSS screen capture failed: {e}")
+            return None
+
+    def capture_screen_shortcut(self, monitor_number=1):
+        """Capture screen using keyboard shortcut."""
+        try:
             simulate_screenshot_shortcut()
             
             # Give the system a moment to save the screenshot
             interval = self.config.get('screenshot', {}).get('interval', 5)
             time.sleep(min(interval * 0.1, 0.5))  # Wait up to 0.5s or 10% of interval
             
-            # Find the newly created screenshot
             screenshot_path = find_latest_screenshot(max_age_seconds=5)
             
             if not screenshot_path:
@@ -63,21 +94,31 @@ class ScreenOCR:
                 return None
                 
             self.last_screenshot_path = screenshot_path
-            # Read the image using OpenCV
-            image = cv2.imread(screenshot_path)
-            
-            if image is None:
-                _logger.error(f"Failed to read screenshot from {screenshot_path}")
-                return None
-
-            # Clean up old screenshots after successful capture
-            self.cleanup_old_screenshots()
-                
-            return image
+            return cv2.imread(screenshot_path)
             
         except Exception as e:
-            _logger.error(f"Failed to capture screen: {e}")
+            _logger.error(f"Keyboard shortcut screen capture failed: {e}")
             return None
+
+    def capture_screen(self, monitor_number=1):
+        """Capture screen content using configured method."""
+        method = self.config.get('screenshot', {}).get('method', 'mss')
+        _logger.debug("Using screenshot method: %s", method)
+        
+        if method == 'mss':
+            _logger.debug("Using MSS capture method")
+            image = self.capture_screen_mss(monitor_number)
+        else:
+            _logger.debug("Using keyboard shortcut capture method")
+            image = self.capture_screen_shortcut(monitor_number)
+            
+        if image is not None:
+            _logger.debug("Screenshot captured successfully")
+            self.cleanup_old_screenshots()
+        else:
+            _logger.error("Screenshot capture failed")
+            
+        return image
 
     def process_image(self, image):
         """Process image for better OCR results."""
