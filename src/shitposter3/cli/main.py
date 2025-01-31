@@ -3,6 +3,7 @@
 import click
 import asyncio
 import logging
+import psutil
 from ..core.engine import AutomationEngine
 from ..services.http_server import run_server
 
@@ -44,6 +45,25 @@ def analyze():
         click.echo(f"Screen content:\n{text}")
     except Exception as e:
         _logger.error(f"Analysis failed: {e}")
+
+@cli.command()
+def status():
+    """Print detailed status of the Shitposter processes."""
+    try:
+        while True:
+            click.clear()
+            click.echo("Shitposter Status:")
+            click.echo("=================")
+            for proc in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_info', 'status']):
+                click.echo(f"PID: {proc.info['pid']}")
+                click.echo(f"Name: {proc.info['name']}")
+                click.echo(f"CPU: {proc.info['cpu_percent']}%")
+                click.echo(f"Memory: {proc.info['memory_info'].rss / 1024 ** 2:.2f} MB")
+                click.echo(f"Status: {proc.info['status']}")
+                click.echo("-----------------")
+            asyncio.sleep(1)
+    except KeyboardInterrupt:
+        click.echo("Status monitoring stopped.")
 
 if __name__ == '__main__':
     cli()
