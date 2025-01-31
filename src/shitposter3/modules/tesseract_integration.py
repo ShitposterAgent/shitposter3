@@ -1,7 +1,7 @@
 """OCR integration module using Tesseract for screen text recognition."""
 
 import logging
-import numpy as np
+import numpy import np
 import cv2
 import subprocess
 import tempfile
@@ -207,16 +207,9 @@ class ScreenOCR:
                                     int(data['height'])
                                 )
                             })
-                
                         except (ValueError, KeyError) as e:
                             _logger.warning(f"Failed to parse line data: {e}")
                             continue
-                
-                return results
-                
-        except Exception as e:
-            _logger.error(f"OCR extraction with positions failed: {e}")
-            return None
                 return results
                 
         except Exception as e:
