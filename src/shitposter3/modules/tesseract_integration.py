@@ -72,32 +72,92 @@ class ScreenOCR:
                 _logger.error(f"Failed to remove old screenshot {file_path}: {e}")
 
     def capture_screen(self):
-        """Capture the screen using MSS instance and save with timestamped filename."""
+        """Capture the screen using multiple fallback methods."""
+        timestamp = time.strftime("%Y%m%d-%H%M%S")
+        filename = os.path.expanduser(
+            os.path.join(
+                self.config.get('screenshot', {}).get('save_path', '~/shitposter_data/screenshots'),
+                f"screenshot_{timestamp}.png"
+            )
+        )
+
+        # Try different screenshot methods
+        methods = [
+            self._capture_with_mss,
+            self._capture_with_gnome_screenshot,
+            self._capture_with_xdg_screenshot,
+            self._capture_with_scrot
+        ]
+
+        for method in methods:
+            try:
+                result = method(filename)
+                if result is not None:
+                    self.last_screenshot_path = filename
+                    return result
+            except Exception as e:
+                _logger.debug(f"Screenshot method failed: {method.__name__}: {e}")
+                continue
+
+        _logger.error("All screenshot methods failed")
+        return None
+
+    def _capture_with_mss(self, filename):
+        """Capture screen using MSS."""
         try:
-            # Use existing MSS instance
             screenshot = self.sct.grab(self.monitor)
-            
-            # Convert to BGR format for OpenCV
             img = np.array(screenshot)
             img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
-            
-            # Save the screenshot
-            timestamp = time.strftime("%Y%m%d-%H%M%S")
-            filename = os.path.expanduser(
-                os.path.join(
-                    self.config.get('screenshot', {}).get('save_path', '~/shitposter_data/screenshots'),
-                    f"screenshot_{timestamp}.png"
-                )
-            )
-            
             cv2.imwrite(filename, img)
-            _logger.debug(f"Screenshot saved to: {filename}")
-            self.last_screenshot_path = filename
             return img
-            
         except Exception as e:
-            _logger.error(f"Failed to capture screenshot using MSS: {e}")
-            return None
+            _logger.debug(f"MSS screenshot failed: {e}")
+            raise
+
+    def _capture_with_gnome_screenshot(self, filename):
+        """Capture screen using gnome-screenshot."""
+        try:
+            result = subprocess.run(
+                ['gnome-screenshot', '-f', filename],
+                capture_output=True,
+                text=True
+            )
+            if result.returncode == 0:
+                return cv2.imread(filename)
+            raise Exception(f"gnome-screenshot failed: {result.stderr}")
+        except Exception as e:
+            _logger.debug(f"GNOME screenshot failed: {e}")
+            raise
+
+    def _capture_with_xdg_screenshot(self, filename):
+        """Capture screen using xdg-screenshot."""
+        try:
+            result = subprocess.run(
+                ['xdg-screenshot', filename],
+                capture_output=True,
+                text=True
+            )
+            if result.returncode == 0:
+                return cv2.imread(filename)
+            raise Exception(f"xdg-screenshot failed: {result.stderr}")
+        except Exception as e:
+            _logger.debug(f"XDG screenshot failed: {e}")
+            raise
+
+    def _capture_with_scrot(self, filename):
+        """Capture screen using scrot."""
+        try:
+            result = subprocess.run(
+                ['scrot', filename],
+                capture_output=True,
+                text=True
+            )
+            if result.returncode == 0:
+                return cv2.imread(filename)
+            raise Exception(f"scrot failed: {result.stderr}")
+        except Exception as e:
+            _logger.debug(f"Scrot screenshot failed: {e}")
+            raise
 
     def extract_text(self, image=None, lang=None):
         """Extract text from image using Tesseract OCR via subprocess."""
